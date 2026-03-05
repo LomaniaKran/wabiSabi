@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:wabisabi_front/data/mock_data/mock_users.dart';
 import 'package:wabisabi_front/data/mock_data/mock_posts.dart';
+import 'package:wabisabi_front/data/models/post.dart';
 import 'package:wabisabi_front/data/models/user.dart';
+import 'package:wabisabi_front/presentation/screens/create_post_screen.dart';
+import 'package:wabisabi_front/presentation/screens/post_detail_screen.dart';
 import 'package:wabisabi_front/presentation/widgets/post_card.dart';
 import 'package:wabisabi_front/core/constants/app_colors.dart';
 import 'package:wabisabi_front/core/constants/text_styles.dart';
@@ -21,11 +24,13 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late User _user;
+  late List<Post> _userPosts;
   final ScrollController _scrollController = ScrollController();
   bool _showAppBar = true;
   int _selectedSection = 0;
   final PageController _pageController = PageController();
   final List<String> _savedPostIds = [];
+  final String _currentUserId = 'sakura_art'; // ID текущего пользователя
 
   final List<String> _sections = [
     'Общая информация',
@@ -37,9 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _user = MockUsers.getUserById(widget.userId);
+    _loadUserData();
     
-    // Слушатель для скрытия/показа AppBar
     _scrollController.addListener(() {
       if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
         if (_showAppBar) {
@@ -53,6 +57,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  void _loadUserData() {
+    setState(() {
+      _user = MockUsers.getUserById(widget.userId);
+      _userPosts = MockPosts.getPostsByAuthor(widget.userId);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.userId != widget.userId) {
+      _loadUserData();
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -64,8 +83,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return _savedPostIds.contains(postId);
   }
 
+  void _toggleSavePost(String postId) {
+    setState(() {
+      if (_savedPostIds.contains(postId)) {
+        _savedPostIds.remove(postId);
+      } else {
+        _savedPostIds.add(postId);
+      }
+    });
+  }
+
+  // Удаление поста
+void _deletePost(String postId) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      title: const Text('Удалить пост?'),
+      content: const Text('Это действие нельзя будет отменить.'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Отмена'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _userPosts.removeWhere((post) => post.id == postId);
+              // Удаляем из MockPosts
+              MockPosts.posts.removeWhere((post) => post.id == postId);
+            });
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Пост удалён'),
+                backgroundColor: AppColors.primary,
+                duration: const Duration(seconds: 1),
+              ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.error,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Удалить'),
+        ),
+      ],
+    ),
+  );
+}
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'эксперт':
+        return const Color(0xFF9C27B0).withOpacity(0.8);
+      case 'профи':
+        return const Color(0xFF2196F3).withOpacity(0.8);
+      case 'любитель':
+        return const Color(0xFF4CAF50).withOpacity(0.8);
+      case 'новичок':
+        return const Color(0xFFFF9800).withOpacity(0.8);
+      default:
+        return AppColors.primary.withOpacity(0.8);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool isOwnProfile = _user.isCurrentUser;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: NestedScrollView(
@@ -84,11 +171,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: () => Navigator.pop(context),
                 color: AppColors.textPrimary,
               ),
-              centerTitle: true, // Добавляем эту строку
+              centerTitle: true,
               title: _showAppBar ? _buildAppBarTitle() : null,
               flexibleSpace: FlexibleSpaceBar(
                 collapseMode: CollapseMode.pin,
-                background: _buildProfileHeader(),
+                background: _buildProfileHeader(isOwnProfile),
               ),
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(60),
@@ -97,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ];
         },
-        body: _buildSelectedSection(),
+        body: _buildSelectedSection(isOwnProfile),
       ),
     );
   }
@@ -106,35 +193,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return AnimatedOpacity(
       duration: const Duration(milliseconds: 200),
       opacity: _showAppBar ? 1.0 : 0.0,
-      child: Container(
-        height: 4,
-        width: 100, // Делаем ещё шире
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.primary, AppColors.secondary],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
+      child: Center(
+        child: Container(
+          height: 4,
+          width: 100,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.primary, AppColors.secondary],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
+            borderRadius: BorderRadius.circular(2),
           ),
-          borderRadius: BorderRadius.circular(2),
         ),
       ),
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(bool isOwnProfile) {
     return Container(
       color: AppColors.surface,
       child: Column(
         children: [
-          const SizedBox(height: 70), // Отступ для AppBar
+          const SizedBox(height: 70),
           
-          // Аватар и основная информация
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Аватар
                 Container(
                   width: 80,
                   height: 80,
@@ -163,7 +250,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 
                 const SizedBox(width: 20),
                 
-                // Имя и статус
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +260,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 6),
                       
-                      // Статус (новичок/профи) - теперь пастельный
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -200,12 +285,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       
                       const SizedBox(height: 12),
                       
-                      // Статусы в строку - обе плашки зелёные
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          // Тег "Даю/не даю советы"
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -252,7 +335,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
 
-                          // Тег "Ищу/не ищу советы" - ТЕПЕРЬ ЗЕЛЁНЫЙ
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -313,42 +395,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'профи':
-        return const Color(0xFF4CAF50); // Зелёный
-      case 'любитель':
-        return const Color(0xFF2196F3); // Синий
-      case 'новичок':
-        return const Color(0xFFFF9800); // Оранжевый
-      default:
-        return AppColors.primary;
-    }
-  }
-
-  Widget _buildStatItem({required String value, required String label}) {
-    return Column(
-      children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSectionCarousel() {
     return Container(
       height: 60,
@@ -405,41 +451,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSelectedSection() {
+  Widget _buildSelectedSection(bool isOwnProfile) {
     return PageView(
       controller: _pageController,
       onPageChanged: (index) {
         setState(() => _selectedSection = index);
       },
       children: [
-        // 1. Общая информация
-        _buildGeneralInfoSection(),
-        
-        // 2. Посты пользователя
-        _buildPostsSection(),
-        
-        // 3. Советы (заглушка)
+        _buildGeneralInfoSection(isOwnProfile),
+        _buildPostsSection(isOwnProfile),
         _buildPlaceholderSection('Раздел "Советы" в разработке'),
-        
-        // 4. Комментарии (заглушка)
         _buildPlaceholderSection('Раздел "Комментарии" в разработке'),
       ],
     );
   }
 
-  Widget _buildGeneralInfoSection() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Описание (био)
-          if (_user.bio != null && _user.bio!.isNotEmpty)
-            Column(
+  Widget _buildGeneralInfoSection(bool isOwnProfile) {
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_user.bio != null && _user.bio!.isNotEmpty) ...[
+                  const Text(
+                    'О себе:',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _user.bio!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                
                 const Text(
-                  'О себе:',
+                  'Сильные стороны:',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -447,126 +505,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  _user.bio!,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    height: 1.5,
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _user.strongSides.map((side) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        side,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                const Text(
+                  'Слабые стороны:',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _user.needHelpIn.map((area) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.secondary.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        area,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                
+                const SizedBox(height: 32),
+                
+                if (isOwnProfile)
+                  Center(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: Переход к редактированию профиля
+                      },
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('Редактировать профиль'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                
+                const SizedBox(height: 40),
               ],
             ),
-          
-          // Сильные стороны
-          const Text(
-            'Сильные стороны:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _user.strongSides.map((side) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primary.withOpacity(0.3),
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  side,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary, // Чёрный текст
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Слабые стороны (бывшие "Нужна помощь в")
-          const Text(
-            'Слабые стороны:',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _user.needHelpIn.map((area) {
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.secondary.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.secondary.withOpacity(0.4),
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  area,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary, // Чёрный текст
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 32),
-          
-          // Кнопка редактирования (только для своего профиля)
-          if (_user.isCurrentUser)
-            Center(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Переход к редактированию профиля
-                },
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('Редактировать профиль'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          
-          const SizedBox(height: 40),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildPostsSection() {
-    final userPosts = MockPosts.getPostsByAuthor(_user.id);
+Widget _buildPlaceholderSection(String text) {
+  return CustomScrollView(
+    slivers: [
+      SliverFillRemaining(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.build,
+                size: 60,
+                color: AppColors.textSecondary.withOpacity(0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                text,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+  Widget _buildPostsSection(bool isOwnProfile) {
+    final String currentUserId = 'sakura_art';
     
-    if (userPosts.isEmpty) {
+    if (_userPosts.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -578,57 +646,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Пока нет постов',
+              isOwnProfile 
+                  ? 'У вас пока нет постов' 
+                  : 'У пользователя пока нет постов',
               style: TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
               ),
             ),
+            if (isOwnProfile) ...[
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreatePostScreen(),
+                    ),
+                  ).then((_) => _loadUserData());
+                },
+                icon: const Icon(Icons.add),
+                label: const Text('Создать первый пост'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ],
         ),
       );
     }
     
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: userPosts.length,
-      itemBuilder: (context, index) {
-        final post = userPosts[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: PostCard(
-            post: post,
-            isSaved: _isPostSaved(post.id),
-            onTap: () {
-              // TODO: Переход к деталям поста
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPlaceholderSection(String text) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.build,
-            size: 60,
-            color: AppColors.textSecondary.withOpacity(0.3),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textSecondary,
+    return CustomScrollView(
+      slivers: [
+        // Шапка раздела с кнопкой создания поста
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isOwnProfile ? 'Мои посты' : 'Посты пользователя',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                if (isOwnProfile)
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.secondary],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CreatePostScreen(),
+                            ),
+                          ).then((_) => _loadUserData());
+                        },
+                        customBorder: const CircleBorder(),
+                        child: Container(
+                          width: 48,
+                          height: 48,
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.add,
+                            color: Colors.white,
+                            size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            textAlign: TextAlign.center,
           ),
-        ],
-      ),
+        ),
+        
+        // Список постов - используем SliverList вместо ListView.builder
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final post = _userPosts[index];
+              final bool isOwnPost = post.authorId == currentUserId;
+              
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: PostCard(
+                  post: post,
+                  isSaved: _isPostSaved(post.id),
+                  showDeleteButton: isOwnProfile && isOwnPost,
+                  onDelete: (isOwnProfile && isOwnPost) ? () => _deletePost(post.id) : null,
+                  onAvatarTap: () {
+                    if (!isOwnProfile) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProfileScreen(userId: post.authorId),
+                        ),
+                      );
+                    }
+                  },
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PostDetailScreen(post: post),
+                      ),
+                    ).then((_) => _loadUserData());
+                  },
+                ),
+              );
+            },
+            childCount: _userPosts.length,
+          ),
+        ),
+        
+        // Добавляем отступ снизу
+        const SliverToBoxAdapter(
+          child: SizedBox(height: 20),
+        ),
+      ],
     );
   }
 }

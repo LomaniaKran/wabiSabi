@@ -3,13 +3,13 @@ class User {
   final String username;
   final String? avatarUrl;
   final String? bio;
-  final String status; // новичок, профи и т.д.
+  final String status;
   final List<String> strongSides;
   final List<String> needHelpIn;
   final bool isAcceptingAdvice;
   final bool isLookingForHelp;
   final Map<String, int> adviceStats;
-  final bool isCurrentUser; // Является ли текущим пользователем
+  final bool isCurrentUser;
 
   const User({
     required this.id,
@@ -25,7 +25,6 @@ class User {
     required this.isCurrentUser,
   });
 
-  // Метод для вычисления общего количества советов
   int get totalAdviceCount {
     return adviceStats.values.fold(0, (sum, value) => sum + value);
   }

@@ -1,11 +1,11 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:wabisabi_front/presentation/screens/login_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/text_styles.dart';
+import 'presentation/screens/login_screen.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -18,21 +18,13 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primary,
-          background: AppColors.background,
           surface: AppColors.surface,
-          primary: AppColors.primary,
-          secondary: AppColors.secondary,
         ),
         scaffoldBackgroundColor: AppColors.background,
         appBarTheme: const AppBarTheme(
           backgroundColor: AppColors.surface,
           elevation: 0,
           iconTheme: IconThemeData(color: AppColors.textPrimary),
-          titleTextStyle: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
         ),
         dividerTheme: const DividerThemeData(
           color: AppColors.divider,
@@ -40,16 +32,6 @@ class MyApp extends StatelessWidget {
           space: 0,
         ),
         textTheme: const TextTheme(
-          displayLarge: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
-          displayMedium: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
           titleLarge: AppTextStyles.titleLarge,
           titleMedium: AppTextStyles.titleMedium,
           bodyLarge: AppTextStyles.bodyLarge,
@@ -57,28 +39,17 @@ class MyApp extends StatelessWidget {
           bodySmall: AppTextStyles.bodySmall,
           labelLarge: AppTextStyles.button,
         ),
-        splashFactory: InkRipple.splashFactory,
-        highlightColor: AppColors.primary.withOpacity(0.1),
-        
-        // Для карточек
-        cardTheme: CardThemeData(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20), // Увеличиваем радиус
+        // Исправляем CardTheme - используем CardThemeData
+        cardTheme: CardThemeData( // Изменено с CardTheme на CardThemeData
+          elevation: 2,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
           ),
           color: AppColors.surface,
           clipBehavior: Clip.antiAlias,
         ),
-  
-  // Для кнопок
-  iconButtonTheme: IconButtonThemeData(
-    style: IconButton.styleFrom(
-      foregroundColor: AppColors.textPrimary,
-    ),
-  ),
-  
-  useMaterial3: true,
-),
+        useMaterial3: true,
+      ),
       home: const LoginScreen(),
       debugShowCheckedModeBanner: false,
     );
