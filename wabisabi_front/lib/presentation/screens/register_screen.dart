@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:wabisabi_front/presentation/screens/feed_screen.dart';
-import 'package:wabisabi_front/presentation/screens/login_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wabisabi_front/core/constants/app_colors.dart';
 import 'package:wabisabi_front/core/constants/text_styles.dart';
+import 'package:wabisabi_front/data/api_client.dart';
+import 'login_screen.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -30,39 +31,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _handleRegister() {
-    // Простая валидация для прототипа
+  void _handleRegister() async {
+    // 1. Проверка паролей
     if (_passwordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Пароли не совпадают'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    if (!_agreeToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Необходимо согласиться с условиями'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пароли не совпадают')));
       return;
     }
 
     setState(() => _isLoading = true);
-    
-    // Имитация регистрации
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() => _isLoading = false);
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const FeedScreen()),
-        (route) => false,
+
+    try {
+      bool success = await ApiClient.register(
+        _usernameController.text,
+        _emailController.text,
+        _passwordController.text,
       );
-    });
+
+      // ВАЖНО: всегда выключаем загрузку
+      setState(() => _isLoading = false);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Успешно! Теперь войдите.')));
+        Navigator.pop(context); 
+      } else {
+        // Если пришло не 201 (успех), значит, сервер вернул ошибку
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Пользователь уже существует или ошибка!')));
+      }
+    } catch (e) {
+      // Даже если что-то сломалось (например, нет интернета)
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка соединения: $e')));
+    }
   }
 
   @override
@@ -338,7 +337,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 2,
-          shadowColor: AppColors.primary.withOpacity(0.3),
         ),
         child: _isLoading
             ? const SizedBox(

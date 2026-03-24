@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =================================================================
+// 1. ПОЛЬЗОВАТЕЛИ И ПРОФИЛИ
+// =================================================================
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  bio       String?
+  
+  isSeekingAdvice Boolean @default(true)
+  isOfferingAdvice Boolean @default(false)
+
+  helpfulCommentsCount Int @default(0)
+  thanksReceivedCount  Int @default(0)
+
+  // <<< ДОБАВЛЕНЫ ОБРАТНЫЕ СВЯЗИ >>>
+  ownedRelations UserRelation[] @relation("OwnerRelations")
+  targetRelations UserRelation[] @relation("TargetUser")
+  
+  posts       Post[]
+  comments    Comment[]
+  userSkills  UserSkill[]
+}
+
+model Skill {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique
+  userSkills UserSkill[]
+}
+
+model UserSkill {
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id])
+  skillId   Int
+  skill     Skill   @relation(fields: [skillId], references: [id])
+  isStrength Boolean
+  
+  @@id([userId, skillId])
+}
+
+
+// =================================================================
+// 2. ПОСТЫ И МЕДИА
+// =================================================================
+
+model Post {
+  id            Int         @id @default(autoincrement())
+  authorId      Int
+  author        User        @relation(fields: [authorId], references: [id])
+  content       String
+  
+  feedbackLevel String      @default("constructive")
+  allowDownload Boolean     @default(true)
+  
+  // НОВОЕ ПОЛЕ ДЛЯ ПРИВАТНОСТИ КОММЕНТАРИЕВ
+  commentPrivacy String     @default("ALL") // "ALL", "BLACKLIST", "WHITELIST", "DISABLED"
+  
+  attachments   MediaAttachment[]
+  comments      Comment[]
+  createdAt     DateTime    @default(now())
+}
+
+model MediaAttachment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  post      Post     @relation(fields: [postId], references: [id])
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+}
+
+
+// =================================================================
+// 3. КОММЕНТАРИИ И МОДЕРАЦИЯ
+// =================================================================
+
+model Comment {
+  id            Int         @id @default(autoincrement())
+  content       String
+  authorId      Int
+  author        User        @relation(fields: [authorId], references: [id])
+  postId        Int
+  post          Post        @relation(fields: [postId], references: [id])
+  
+  isHelpful     Boolean     @default(false) 
+  
+  complaints    Complaint[]
+  
+  createdAt     DateTime    @default(now())
+}
+
+model Complaint {
+  id            Int         @id @default(autoincrement())
+  commentId     Int
+  comment       Comment     @relation(fields: [commentId], references: [id])
+  complainantId Int         @map("complainant_id")
+  isResolved    Boolean     @default(false)
+  
+  createdAt     DateTime    @default(now())
+}
+
+// МОДЕЛЬ СПИСКОВ (БЫВШИЙ BLOCKED_USER)
+model UserRelation {
+  ownerId      Int
+  owner        User   @relation("OwnerRelations", fields: [ownerId], references: [id])
+  
+  targetId     Int
+  targetUser   User   @relation("TargetUser", fields: [targetId], references: [id])
+  
+  relationType String // 'BLACKLIST' или 'WHITELIST'
+  
+  @@id([ownerId, targetId, relationType])
+}

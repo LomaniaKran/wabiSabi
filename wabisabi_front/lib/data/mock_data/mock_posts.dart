@@ -1,5 +1,4 @@
 import '../models/post.dart';
-import 'mock_comments.dart';
 
 class MockPosts {
   static List<Post> posts = [

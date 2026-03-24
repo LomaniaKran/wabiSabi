@@ -1,21 +1,41 @@
-import express from 'express'
-import posts from './data/db.js';
+// index.js (Главный файл сервера)
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const authRoutes = require('./routes/auth'); // <--- Добавили импорт auth
+const profileRoutes = require('./routes/profile'); // <--- Добавим позже
+const { PrismaClient } = require('@prisma/client');
 
 const app = express();
 
+app.use((req, res, next) => {
+    console.log(`[SERVER DEBUG] Получен запрос: ${req.method} ${req.url}`);
+    next();
+});
 
+const prisma = new PrismaClient(); 
+
+app.use(cors());
 app.use(express.json());
 
-app.get('/posts', (req, res) => {
-  res.json(posts);
-});
+// ----------------------------------------------------
+// 1. Подключение маршрутов
+// ----------------------------------------------------
+app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes); 
 
-app.post('/posts', (req, res) => {
-  let post = req.body;
-  posts.push(post)
-  res.status(201).json(post);
-});
+app.get('/', (req, res) => res.send('Wabi-Sabi Server is running!'));
 
-app.listen(3000, () => {
-  console.log('Server started on port 3000');
+// Проверка связи с БД (Осталось с прошлого раза)
+app.get('/test-db', async (req, res) => {
+    try {
+        const users = await prisma.user.findMany();
+        res.json({ message: "DB OK", count: users.length });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
+// ----------------------------------------------------
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));

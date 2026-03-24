@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wabisabi_front/presentation/screens/feed_screen.dart';
 import 'package:wabisabi_front/presentation/screens/register_screen.dart';
+import 'package:wabisabi_front/providers/auth_provider.dart';
 import 'package:wabisabi_front/core/constants/app_colors.dart';
 import 'package:wabisabi_front/core/constants/text_styles.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
@@ -24,18 +26,53 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  void _handleLogin() async {
+    print("Кнопка логина нажата");
     setState(() => _isLoading = true);
-    
-    // Имитация загрузки для прототипа
-    Future.delayed(const Duration(seconds: 1), () {
-      setState(() => _isLoading = false);
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const FeedScreen()),
-        (route) => false,
+
+    try {
+      print("Пытаюсь вызвать ApiClient.login...");
+      
+      // Вызываем логин, который теперь работает через провайдер, 
+      // и он сам вернет токен и загрузит пользователя.
+      await ref.read(authProvider.notifier).login(
+        _emailController.text, 
+        _passwordController.text
       );
-    });
+
+      // Если дошли сюда, значит, не было исключений, и AuthProvider обновил состояние.
+      
+      if (!mounted) return; 
+      
+      // Проверяем состояние после того, как провайдер отработал
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated) {
+          print("Вход успешен, перехожу на FeedScreen");
+          
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const FeedScreen()),
+            (route) => false,
+          );
+      } else {
+          // Это сработает, если провайдер поймал ошибку сервера и сам ее записал в state.error
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authState.error ?? 'Неизвестная ошибка входа'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+      }
+
+    } catch (e) {
+      // Обработка ошибок, которые вылетели напрямую (например, проблемы с сетью)
+      print("ПОЙМАНА КРИТИЧЕСКАЯ ОШИБКА В CATCH: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Критическая ошибка: $e'), backgroundColor: AppColors.error),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -50,22 +87,18 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const SizedBox(height: 40),
               
-              // Приветствие и заголовок
               _buildWelcomeSection(),
               
               const SizedBox(height: 40),
               
-              // Форма входа
               _buildLoginForm(),
               
               const SizedBox(height: 32),
               
-              // Кнопка входа
               _buildLoginButton(),
               
               const SizedBox(height: 32),
               
-              // Ссылка на регистрацию
               _buildRegisterLink(),
               
               const SizedBox(height: 20),
@@ -80,7 +113,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Логотип или иконка
         Center(
           child: Container(
             width: 80,
@@ -134,7 +166,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildLoginForm() {
     return Column(
       children: [
-        // Поле email/логина
         TextField(
           controller: _emailController,
           decoration: InputDecoration(
@@ -157,7 +188,6 @@ class _LoginScreenState extends State<LoginScreen> {
         
         const SizedBox(height: 20),
         
-        // Поле пароля
         TextField(
           controller: _passwordController,
           decoration: InputDecoration(
@@ -189,7 +219,6 @@ class _LoginScreenState extends State<LoginScreen> {
         
         const SizedBox(height: 16),
         
-        // Забыли пароль? (опционально)
         Align(
           alignment: Alignment.centerRight,
           child: TextButton(
@@ -222,7 +251,6 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: 2,
-          shadowColor: AppColors.primary.withOpacity(0.3),
         ),
         child: _isLoading
             ? const SizedBox(

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/post.dart';        // Добавляем импорт Post
 import '../data/models/comment.dart';     // Добавляем импорт Comment
-import '../data/models/user.dart';        // Добавляем импорт User
 import '../data/repositories/post_repository.dart';
 import '../data/repositories/comment_repository.dart';
 import '../data/repositories/user_repository.dart';
@@ -34,17 +33,4 @@ final userPostsProvider = FutureProvider.family<List<Post>, String>((ref, userId
 
 final postCommentsProvider = FutureProvider.family<List<Comment>, String>((ref, postId) async {
   return ref.watch(commentRepositoryProvider).getCommentsForPost(postId);
-});
-
-// Текущий пользователь
-final currentUserProvider = Provider<User>((ref) {
-  return ref.watch(userRepositoryProvider).getCurrentUser();
-});
-
-final userProvider = Provider.family<User, String>((ref, userId) {
-  return ref.watch(userRepositoryProvider).getUserById(userId);
-});
-
-final isCurrentUserProvider = Provider.family<bool, String>((ref, userId) {
-  return ref.watch(userRepositoryProvider).isCurrentUser(userId);
 });

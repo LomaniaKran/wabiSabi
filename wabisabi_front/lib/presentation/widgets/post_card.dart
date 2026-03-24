@@ -42,7 +42,7 @@ class PostCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _buildImageGallery(context),
-            if (post.description != null && post.description!.isNotEmpty)
+            if (post.description.isNotEmpty)
               _buildDescription(),
             if (post.isAskingForHelp && post.question != null)
               _buildQuestionSection(),
@@ -344,7 +344,7 @@ Widget _buildImageGallery(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
-        post.description!,
+        post.description,
         style: AppTextStyles.bodyMedium.copyWith(
           color: AppColors.textPrimary,
           height: 1.4,

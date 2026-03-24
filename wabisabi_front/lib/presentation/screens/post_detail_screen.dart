@@ -178,7 +178,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   // Жалоба на комментарий
   void _reportComment(String commentId) {
-    final comment = _comments.firstWhere((c) => c.id == commentId);
+    _comments.firstWhere((c) => c.id == commentId);
     
     showDialog(
       context: context,
@@ -451,14 +451,14 @@ Widget build(BuildContext context) {
                   
                   const SizedBox(height: 20),
                   
-                  if (widget.post.description != null && widget.post.description!.isNotEmpty)
+                  if (widget.post.description.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.post.description!,
+                            widget.post.description,
                             style: AppTextStyles.bodyMedium.copyWith(
                               height: 1.5,
                             ),
@@ -467,7 +467,7 @@ Widget build(BuildContext context) {
                                 ? TextOverflow.visible
                                 : TextOverflow.ellipsis,
                           ),
-                          if (widget.post.description!.length > 150)
+                          if (widget.post.description.length > 150)
                             GestureDetector(
                               onTap: () {
                                 setState(() {
