@@ -59,6 +59,25 @@ class UserRepository {
     }
   }
 
+  Future<List<String>> fetchAvailableSkills() async {
+    final token = await AuthStorage.getToken();
+    // Проверь baseUrl!
+    final response = await http.get(
+      Uri.parse('$baseUrl/profile/skills'), 
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> skillsJson = jsonDecode(response.body);
+      return skillsJson.map((item) => item.toString()).toList();
+    } else {
+      throw Exception('Не удалось получить список навыков: ${response.statusCode}');
+    }
+  }
+
   // 3. Метод получения профиля (защищенный)
   Future<Map<String, dynamic>> fetchCurrentUser() async {
     final token = await AuthStorage.getToken();

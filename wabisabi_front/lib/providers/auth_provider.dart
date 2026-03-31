@@ -32,6 +32,15 @@ class AuthState {
   }
 }
 
+final allSkillsProvider = FutureProvider<List<String>>((ref) async {
+  // Получаем экземпляр UserRepository
+  final userRepository = ref.read(userRepositoryProvider);
+  
+  // Провайдер сам позаботится о запросе токена и обработке ошибок
+  // Если репозиторий вернет ошибку, провайдер будет в состоянии 'error'
+  return await userRepository.fetchAvailableSkills();
+});
+
 class AuthNotifier extends StateNotifier<AuthState> {
   final UserRepository _userRepository;
   

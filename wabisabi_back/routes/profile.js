@@ -16,6 +16,22 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
+router.get('/skills', authenticateToken, async (req, res) => {
+    try {
+        const skills = await prisma.skill.findMany({
+            orderBy: { name: 'asc' } // Сортируем по имени для удобства
+        });
+        
+        // Возвращаем только названия навыков
+        const skillNames = skills.map(skill => skill.name);
+        res.json(skillNames);
+        
+    } catch (e) {
+        console.error("Ошибка при получении списка навыков:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         const userId = parseInt(req.user.userId);
@@ -62,10 +78,19 @@ router.get('/me', authenticateToken, async (req, res) => {
 
 router.patch('/profile', authenticateToken, async (req, res) => {
     try {
-        const { bio, strongSides, needHelpIn } = req.body;
+        const { bio, strongSides, needHelpIn, isOfferingAdvice, isSeekingAdvice } = req.body; // <<< ПРИНИМАЕМ ИХ
         const userId = parseInt(req.user.userId); 
 
         await prisma.$transaction(async (tx) => {
+            await tx.user.update({
+                where: { id: userId },
+                data: { 
+                    bio,
+                    isOfferingAdvice, // <<< СОХРАНЯЕМ ИХ
+                    isSeekingAdvice   // <<< СОХРАНЯЕМ ИХ
+                }
+            });
+
             // 1. Обновляем био
             await tx.user.update({
                 where: { id: userId },
