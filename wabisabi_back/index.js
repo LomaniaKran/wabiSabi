@@ -15,7 +15,11 @@ app.use((req, res, next) => {
 
 const prisma = new PrismaClient(); 
 
-app.use(cors());
+app.use(cors({
+  origin: '*', // Или укажи адрес твоего фронтенда (например, http://localhost:...)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'] // <-- ЭТОТ ЗАГОЛОВОК ОБЯЗАТЕЛЕН
+}));
 app.use(express.json());
 
 // ----------------------------------------------------

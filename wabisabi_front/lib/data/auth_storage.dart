@@ -1,19 +1,24 @@
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthStorage {
-  static const _storage = FlutterSecureStorage();
   static const _keyToken = 'jwt_token';
 
   static Future<void> saveToken(String token) async {
-    await _storage.write(key: _keyToken, value: token);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyToken, token);
+    print("AuthStorage: Token saved to SharedPreferences.");
   }
 
   static Future<String?> getToken() async {
-    return await _storage.read(key: _keyToken);
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(_keyToken);
+    print("AuthStorage: getToken result: $token");
+    return token;
   }
 
-  // Добавим очистку для выхода из аккаунта
   static Future<void> deleteToken() async {
-    await _storage.delete(key: _keyToken);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyToken);
+    print("AuthStorage: Token deleted.");
   }
 }

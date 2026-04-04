@@ -33,11 +33,8 @@ class AuthState {
 }
 
 final allSkillsProvider = FutureProvider<List<String>>((ref) async {
-  // Получаем экземпляр UserRepository
   final userRepository = ref.read(userRepositoryProvider);
   
-  // Провайдер сам позаботится о запросе токена и обработке ошибок
-  // Если репозиторий вернет ошибку, провайдер будет в состоянии 'error'
   return await userRepository.fetchAvailableSkills();
 });
 
@@ -47,17 +44,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
   AuthNotifier(this._userRepository) : super(AuthState());
 
   // --- ЛОГИН ---
-  Future<void> login(String email, String password) async {
-    try {
-      final result = await _userRepository.login(email, password);
-      final token = result['token'] as String;
-      
-      // Вызываем правильный метод, который существует в твоем коде
-      await loadUserAndSetState(token); 
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-    }
+  // В методе login:
+Future<void> login(String identifier, String password) async {
+  try {
+    final result = await _userRepository.login(identifier, password);
+    final token = result['token'] as String;
+    await AuthStorage.saveToken(token); // Сохраняем в SecureStorage
+    await loadUserAndSetState(token); // Загружаем пользователя с новым токеном
+  } catch (e) {
+    state = state.copyWith(error: e.toString());
   }
+}
 
   // --- РЕГИСТРАЦИЯ ---
   Future<void> register(String username, String email, String password, String? bio) async {
@@ -76,25 +73,55 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // --- ВНУТРЕННИЙ МЕТОД ЗАГРУЗКИ ПРОФИЛЯ (тот самый, что у тебя есть) ---
   Future<void> loadUserAndSetState(String token) async {
+    print("Attempting to load user with token: $token");
     try {
-      // 1. Запрашиваем полные данные пользователя с бэкенда
       final userDetails = await _userRepository.fetchCurrentUser();
+      print("User details received from server: $userDetails");
       
-      // 2. Создаем объект User из JSON
       final user = User.fromJson(userDetails);
-      
-      // 3. Обновляем состояние
+      print("User object created successfully: ${user.username}");
+
       state = state.copyWith(
         isAuthenticated: true,
-        token: token,
+        token: token, // Сохраняем токен в состоянии
         currentUser: user,
         error: null,
       );
+      print("State updated to authenticated. isAuthenticated: ${state.isAuthenticated}");
     } catch (e) {
-      print("Ошибка загрузки профиля: $e");
-      await AuthStorage.deleteToken(); // Очищаем токен
-      state = AuthState(error: "Сессия истекла. Пожалуйста, войдите снова.");
+      // --- ЭТО САМАЯ ВАЖНАЯ ОТЛАДКА ---
+      print("!!!! ERROR loading user: $e !!!!"); // Если здесь ошибка, значит токен не работает
+      await AuthStorage.deleteToken(); // Удаляем невалидный токен
+      state = AuthState(
+        isAuthenticated: false, 
+        error: "Сессия истекла. Пожалуйста, войдите снова.",
+        token: null, // Сбрасываем токен в состоянии
+        currentUser: null // Сбрасываем пользователя
+      );
+      print("Error occurred. Deleted token. State reset to logged out.");
     }
+  }
+
+  Future<void> checkAuthStatus() async {
+    final token = await AuthStorage.getToken();
+    // --- ДОБАВЬ ЭТИ СТРОКИ ---
+    print("--- Auth Check ---");
+    print("Token retrieved from storage: $token"); 
+
+    if (token != null) {
+      // Если токен есть, пытаемся загрузить пользователя
+      await loadUserAndSetState(token);
+    } else {
+      // Если токена нет, явно сбрасываем состояние
+      state = state.copyWith(
+        isAuthenticated: false, 
+        currentUser: null, 
+        token: null, // Важно сбросить и токен в состоянии
+        error: null // Убираем предыдущие ошибки
+      );
+      print("No token found. Resetting state to logged out.");
+    }
+    print("--- Auth Check Complete ---");
   }
 
   // --- ВЫХОД ---
@@ -107,4 +134,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 // Обновляем провайдер, чтобы он получал репозиторий
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(ref.watch(userRepositoryProvider));
+});
+
+final appStartupProvider = FutureProvider<void>((ref) async {
+  await ref.read(authProvider.notifier).checkAuthStatus();
 });

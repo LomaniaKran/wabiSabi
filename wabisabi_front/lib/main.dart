@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wabisabi_front/presentation/screens/auth_wrapper.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/text_styles.dart';
 import 'presentation/screens/login_screen.dart';
@@ -39,8 +40,7 @@ class MyApp extends StatelessWidget {
           bodySmall: AppTextStyles.bodySmall,
           labelLarge: AppTextStyles.button,
         ),
-        // Исправляем CardTheme - используем CardThemeData
-        cardTheme: CardThemeData( // Изменено с CardTheme на CardThemeData
+        cardTheme: CardThemeData(
           elevation: 2,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(20)),
@@ -50,7 +50,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const LoginScreen(),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }

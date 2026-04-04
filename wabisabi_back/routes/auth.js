@@ -30,28 +30,39 @@ router.post('/register', async (req, res) => {
 
 // Логин
 router.post('/login', async (req, res) => {
-    console.log("Логин: пришел запрос с данными", req.body);
+    // 1. Принимаем identifier
+    const { identifier, password } = req.body; 
+
     try {
-        const { email, password } = req.body;
-        const user = await prisma.user.findUnique({ where: { email } });
-        
+        // 2. Используем findFirst и OR, чтобы искать или по email, или по username
+        const user = await prisma.user.findFirst({
+            where: {
+                OR: [
+                    { email: identifier },
+                    { username: identifier }
+                ]
+            }
+        });
+
+        // 3. Если пользователя нет
         if (!user) {
-            console.log("Логин: пользователь не найден");
-            return res.status(401).json({ error: 'Неверные данные' });
+            return res.status(400).json({ error: "Пользователь не найден" });
         }
 
-        const valid = await bcrypt.compare(password, user.password);
-        if (!valid) {
-            console.log("Логин: неверный пароль");
-            return res.status(401).json({ error: 'Неверные данные' });
+        // 4. Проверка пароля (убедись, что используешь bcrypt.compare)
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: "Неверный пароль" });
         }
+
+        // 5. Генерация токена
+        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '24h' });
         
-        const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET || 'secret');
-        console.log("Логин: успех, токен создан");
-        res.json({ token, userId: user.id });
+        res.json({ token });
+
     } catch (e) {
-        console.error("Логин: ОШИБКА", e);
-        res.status(500).json({ error: e.message });
+        console.error("Ошибка логина:", e);
+        res.status(500).json({ error: "Ошибка сервера" });
     }
 });
 

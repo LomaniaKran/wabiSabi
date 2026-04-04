@@ -7,17 +7,18 @@ class UserRepository {
   final String baseUrl = 'http://localhost:3000/api'; 
 
   // 1. Метод Входа (Login)
-  Future<Map<String, dynamic>> login(String email, String password) async {
+  Future<Map<String, dynamic>> login(String identifier, String password) async {
     final response = await http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({'email': email, 'password': password}),
+      body: json.encode({
+        'identifier': identifier, // Ключ должен быть 'identifier'
+        'password': password,
+      }),
     );
 
     if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      await AuthStorage.saveToken(data['token']);
-      return data; // Возвращаем токен и userId
+      return json.decode(response.body);
     } else {
       throw Exception('Ошибка входа: ${response.body}');
     }
