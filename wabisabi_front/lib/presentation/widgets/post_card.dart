@@ -283,12 +283,11 @@ Widget _buildImageGallery(BuildContext context) {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          '@${post.authorId}',
+                          '@${post.authorUsername}', // Вместо post.authorId
                           style: TextStyle(
                             color: hasImages ? Colors.white : AppColors.textPrimary,
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
                           ),
                         ),
                       ],

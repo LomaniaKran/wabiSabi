@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const authRoutes = require('./routes/auth'); // <--- Добавили импорт auth
 const profileRoutes = require('./routes/profile'); // <--- Добавим позже
+const postRoutes = require('./routes/posts');
 const { PrismaClient } = require('@prisma/client');
 
 const app = express();
@@ -27,6 +28,7 @@ app.use(express.json());
 // ----------------------------------------------------
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes); 
+app.use('/api/posts', postRoutes);
 
 app.get('/', (req, res) => res.send('Wabi-Sabi Server is running!'));
 

@@ -1,3 +1,4 @@
+// schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,19 +16,28 @@ model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
   email     String   @unique
-  password  String
+  password  String   // Хранит хеш пароля
   bio       String?
   
+  // Поля для советов
   isSeekingAdvice Boolean @default(true)
   isOfferingAdvice Boolean @default(false)
 
+  // Статистика
   helpfulCommentsCount Int @default(0)
   thanksReceivedCount  Int @default(0)
 
-  // <<< ДОБАВЛЕНЫ ОБРАТНЫЕ СВЯЗИ >>>
+  // Дополнительные поля из Flutter модели
+  avatarUrl String?
+  status    String? // Например, "Художник", "Эксперт"
+  
+  // <<< ОБРАТНЫЕ СВЯЗИ >>>
+  // Для списков (блокировки/разрешения)
   ownedRelations UserRelation[] @relation("OwnerRelations")
   targetRelations UserRelation[] @relation("TargetUser")
+  complaints Complaint[] @relation("Complainant")
   
+  // Основные связи
   posts       Post[]
   comments    Comment[]
   userSkills  UserSkill[]
@@ -44,39 +54,55 @@ model UserSkill {
   user      User    @relation(fields: [userId], references: [id])
   skillId   Int
   skill     Skill   @relation(fields: [skillId], references: [id])
-  isStrength Boolean
+  isStrength Boolean // True - сильная сторона, False - нужна помощь
   
-  @@id([userId, skillId])
+  @@id([userId, skillId]) // Составной первичный ключ
 }
 
 
 // =================================================================
-// 2. ПОСТЫ И МЕДИА
+// 2. ПОСТЫ, МЕДИА И КАТЕГОРИИ
 // =================================================================
+
+// Модель для категорий постов (связь Many-to-Many с Post)
+model PostCategory {
+  id     Int    @id @default(autoincrement())
+  name   String @unique // Название категории
+  posts  Post[] @relation("PostCategories") // Список постов, к которым относится категория
+}
 
 model Post {
   id            Int         @id @default(autoincrement())
-  authorId      Int
+  authorId      Int         // ID автора поста
   author        User        @relation(fields: [authorId], references: [id])
-  content       String
   
-  feedbackLevel String      @default("constructive")
-  allowDownload Boolean     @default(true)
+  // title      String?     // <<< УДАЛЕНО, ТАК КАК НАЗВАНИЕ НЕ НУЖНО >>>
+  content       String      // Основное содержимое поста (соответствует description во Flutter)
   
-  // НОВОЕ ПОЛЕ ДЛЯ ПРИВАТНОСТИ КОММЕНТАРИЕВ
-  commentPrivacy String     @default("ALL") // "ALL", "BLACKLIST", "WHITELIST", "DISABLED"
+  // Новые поля для поста (из Flutter модели)
+  isAskingForHelp Boolean     @default(false) // Пользователь просит о помощи
+  question      String?     // Сам вопрос, если isAskingForHelp = true
   
-  attachments   MediaAttachment[]
-  comments      Comment[]
-  createdAt     DateTime    @default(now())
+  // Поля, которые уже были в твоей схеме
+  feedbackLevel String      @default("constructive") // Уровень обратной связи
+  allowDownload Boolean     @default(true)           // Разрешение на скачивание
+  commentPrivacy String     @default("ALL")          // Приватность комментариев ("ALL", "BLACKLIST", "WHITELIST", "DISABLED")
+  
+  // Связи
+  attachments   MediaAttachment[] // Медиа-вложения (картинки)
+  categories    PostCategory[] @relation("PostCategories") // Связь с категориями
+  comments      Comment[]     // Связь с комментариями
+  
+  createdAt     DateTime    @default(now()) // Дата создания
+  updatedAt     DateTime    @updatedAt    // Дата последнего обновления
 }
 
 model MediaAttachment {
   id        Int      @id @default(autoincrement())
   postId    Int
-  post      Post     @relation(fields: [postId], references: [id])
-  fileUrl   String
-  fileType  String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade) // Связь с постом, при удалении поста удаляются и вложения
+  url       String   // URL файла (картинки)
+  fileType  String   // Тип файла (e.g., 'image', 'video')
   createdAt DateTime @default(now())
 }
 
@@ -91,11 +117,11 @@ model Comment {
   authorId      Int
   author        User        @relation(fields: [authorId], references: [id])
   postId        Int
-  post          Post        @relation(fields: [postId], references: [id])
+  post          Post        @relation(fields: [postId], references: [id], onDelete: Cascade) // Связь с постом
   
-  isHelpful     Boolean     @default(false) 
+  isHelpful     Boolean     @default(false) // Полезен ли комментарий
   
-  complaints    Complaint[]
+  complaints    Complaint[] // Связь с жалобами на этот комментарий
   
   createdAt     DateTime    @default(now())
 }
@@ -103,9 +129,10 @@ model Comment {
 model Complaint {
   id            Int         @id @default(autoincrement())
   commentId     Int
-  comment       Comment     @relation(fields: [commentId], references: [id])
-  complainantId Int         @map("complainant_id")
-  isResolved    Boolean     @default(false)
+  comment       Comment     @relation(fields: [commentId], references: [id], onDelete: Cascade) // Связь с комментарием
+  complainantId Int         @map("complainant_id") // ID пользователя, который пожаловался
+  complainant   User        @relation("Complainant", fields: [complainantId], references: [id])
+  isResolved    Boolean     @default(false) // Решена ли жалоба
   
   createdAt     DateTime    @default(now())
 }
@@ -113,12 +140,12 @@ model Complaint {
 // МОДЕЛЬ СПИСКОВ (БЫВШИЙ BLOCKED_USER)
 model UserRelation {
   ownerId      Int
-  owner        User   @relation("OwnerRelations", fields: [ownerId], references: [id])
+  owner        User   @relation("OwnerRelations", fields: [ownerId], references: [id]) // Пользователь, который добавляет в список
   
   targetId     Int
-  targetUser   User   @relation("TargetUser", fields: [targetId], references: [id])
+  targetUser   User   @relation("TargetUser", fields: [targetId], references: [id]) // Целевой пользователь
   
-  relationType String // 'BLACKLIST' или 'WHITELIST'
+  relationType String // Тип отношения: 'BLACKLIST' или 'WHITELIST'
   
-  @@id([ownerId, targetId, relationType])
+  @@id([ownerId, targetId, relationType]) // Составной первичный ключ
 }

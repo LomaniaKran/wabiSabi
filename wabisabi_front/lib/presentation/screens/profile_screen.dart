@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wabisabi_front/core/constants/app_colors.dart';
 import 'package:wabisabi_front/core/constants/text_styles.dart';
 import 'package:wabisabi_front/data/models/user.dart';
+import 'package:wabisabi_front/presentation/screens/create_post_screen.dart';
+import 'package:wabisabi_front/presentation/widgets/post_card.dart';
 import 'package:wabisabi_front/providers/auth_provider.dart'; // Убедись, что путь правильный
 import 'package:wabisabi_front/providers/providers.dart'; // Убедись, что путь правильный
 import 'login_screen.dart';
@@ -157,6 +159,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      // --- ДОБАВЛЯЕМ КНОПКУ ---
+      floatingActionButton: (isOwnProfile && _selectedSection == 1) // Показываем только в своих постах
+          ? FloatingActionButton(
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.add, color: Colors.white),
+              onPressed: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CreatePostScreen()),
+                );
+                // Если пост создан (результат true), можно обновить ленту или стейт
+                if (result == true) {
+                  // Здесь можно добавить обновление списка постов, если нужно
+                }
+              },
+            )
+          : null,
       body: NestedScrollView(
         controller: _scrollController,
         headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -357,8 +376,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         SingleChildScrollView( // Оборачиваем в SingleChildScrollView, чтобы избежать Overflow
           child: _buildGeneralInfoSection(user),
         ),
+        
+        // --- Секция "Посты" ---
+        // Используем userPostsProvider для получения постов конкретного пользователя
+        Consumer( // Оборачиваем в Consumer, чтобы использовать ref
+          builder: (context, ref, child) {
+            final userPostsAsyncValue = ref.watch(userPostsProvider(widget.userId)); // Передаем ID пользователя
+
+            return userPostsAsyncValue.when(
+              loading: () => const Center(child: CircularProgressIndicator()), // Индикатор загрузки
+              error: (err, stack) => Center(child: Text('Ошибка загрузки постов: $err')), // Обработка ошибки
+              data: (posts) {
+                if (posts.isEmpty) {
+                  // Сообщение, если у пользователя нет постов
+                  return const Center(
+                    child: Text(
+                      'Этот пользователь пока не создал постов.',
+                      style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
+                    ),
+                  );
+                }
+                // Отображаем список постов
+                return ListView.builder(
+                  // controller: _scrollController, // Не используем здесь контроллер, он для NestedScrollView
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    final post = posts[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      child: PostCard(
+                        post: post,
+                        // TODO: Реализовать onTap для перехода к PostDetailScreen
+                        onTap: () {
+                          // Navigator.push(context, MaterialPageRoute(builder: (context) => PostDetailScreen(post: post)));
+                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Открытие деталей поста в разработке')));
+                        },
+                         // TODO: Реализовать showDeleteButton и onDelete, если нужно
+                         // showDeleteButton: post.authorId == user.id, // Показываем кнопку удаления, если пост автора
+                         // onDelete: () => _deletePost(post.id),
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          }
+        ),
+        
         // --- Остальные секции (пока заглушки) ---
-        const Center(child: Text("Посты пока в разработке")),
         const Center(child: Text("Советы пока в разработке")),
         const Center(child: Text("Комментарии пока в разработке")),
       ],

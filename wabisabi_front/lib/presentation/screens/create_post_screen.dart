@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:wabisabi_front/data/mock_data/mock_posts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wabisabi_front/data/models/post.dart';
 import 'package:wabisabi_front/core/constants/app_colors.dart';
+import 'package:wabisabi_front/providers/providers.dart';
+import 'package:wabisabi_front/providers/auth_provider.dart';
 
-class CreatePostScreen extends StatefulWidget {
+class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({Key? key}) : super(key: key);
 
   @override
-  State<CreatePostScreen> createState() => _CreatePostScreenState();
+  ConsumerState<CreatePostScreen> createState() => _CreatePostScreenState();
 }
 
-class _CreatePostScreenState extends State<CreatePostScreen> {
+class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _questionController = TextEditingController();
   bool _isAskingForHelp = false;
+  bool _isLoading = false;
   List<String> _selectedCategories = [];
-  List<String> _imageUrls = []; // Для будущих изображений
+  List<String> _imageUrls = []; 
   
   final List<String> _availableCategories = [
     'Анатомия', 'Стилизация', 'Линия', 'Пропорции',
@@ -31,45 +34,52 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     super.dispose();
   }
 
-void _createPost() {
-  if (_descriptionController.text.trim().isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Добавьте описание поста'),
-        backgroundColor: AppColors.error,
-      ),
-    );
-    return;
+  Future<void> _createPost() async {
+    if (_descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Добавьте описание поста'), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final user = ref.read(authProvider).currentUser;
+      if (user == null) throw Exception("Пользователь не авторизован");
+
+      // Формируем новый пост
+      final newPost = Post(
+        id: '', // Сервер сам сгенерирует
+        authorId: user.id,
+        authorUsername: user.username,
+        authorAvatarUrl: user.avatarUrl,
+        description: _descriptionController.text.trim(),
+        imageUrls: _imageUrls, 
+        categories: _selectedCategories.isEmpty ? ['Общее'] : _selectedCategories,
+        isAskingForHelp: _isAskingForHelp,
+        question: _isAskingForHelp ? _questionController.text.trim() : null,
+      );
+
+      // Отправляем на сервер
+      await ref.read(postRepositoryProvider).createPost(newPost);
+
+      if (mounted) {
+        Navigator.pop(context, true); // Возвращаем true, чтобы сказать, что пост создан
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Пост опубликован!'), backgroundColor: AppColors.primary),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка публикации: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-
-  // Если нет изображений, оставляем пустой список
-  final newPost = Post(
-    id: DateTime.now().millisecondsSinceEpoch.toString(),
-    authorId: 'sakura_art',
-    description: _descriptionController.text.trim(),
-    imageUrls: _imageUrls, // Может быть пустым списком
-    createdAt: DateTime.now(),
-    categories: _selectedCategories.isEmpty 
-        ? ['Новый пост'] 
-        : _selectedCategories,
-    isAskingForHelp: _isAskingForHelp,
-    question: _questionController.text.trim().isNotEmpty 
-        ? _questionController.text.trim() 
-        : null,
-    commentCount: 0,
-  );
-
-  MockPosts.posts.insert(0, newPost);
-  
-  Navigator.pop(context, true);
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: const Text('Пост опубликован!'),
-      backgroundColor: AppColors.primary,
-      duration: const Duration(seconds: 1),
-    ),
-  );
-}
 
   @override
   Widget build(BuildContext context) {
@@ -83,24 +93,14 @@ void _createPost() {
           onPressed: () => Navigator.pop(context),
           color: AppColors.textPrimary,
         ),
-        title: const Text(
-          'Создать пост',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const Text('Создать пост', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
         actions: [
-          TextButton(
-            onPressed: _createPost,
-            child: const Text(
-              'Опубликовать',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+          _isLoading 
+            ? const Padding(padding: EdgeInsets.only(right: 20), child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))))
+            : TextButton(
+                onPressed: _createPost,
+                child: const Text('Опубликовать', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600)),
               ),
-            ),
-          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -108,233 +108,53 @@ void _createPost() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Поле для описания (теперь обязательное)
-            const Text(
-              'Описание',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
+            const Text('Описание', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
             const SizedBox(height: 8),
             TextField(
               controller: _descriptionController,
               decoration: InputDecoration(
                 hintText: 'Расскажите о своей работе...',
-                hintStyle: const TextStyle(color: AppColors.textSecondary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary, width: 2),
-                ),
-                filled: true,
-                fillColor: AppColors.surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               ),
               maxLines: 5,
-              minLines: 3,
-              autofocus: true,
             ),
-            
             const SizedBox(height: 20),
             
-            // Кнопка добавления изображений
+            // Заглушка для выбора картинок (пока работает так)
             GestureDetector(
               onTap: () {
-                // TODO: Добавить выбор изображений
-                setState(() {
-                  if (_imageUrls.isEmpty) {
-                    _imageUrls = [
-                      'https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800&auto=format&fit=crop'
-                    ];
-                  } else {
-                    _imageUrls = [];
-                  }
+                 setState(() {
+                  _imageUrls = _imageUrls.isEmpty 
+                    ? ['https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=800https://images.unsplash.com/photo-1611605698335-8b1569810432?w=800&auto=format&fit=crop'] 
+                    : [];
                 });
               },
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _imageUrls.isEmpty 
-                        ? AppColors.divider 
-                        : AppColors.primary,
-                    width: _imageUrls.isEmpty ? 1 : 2,
-                  ),
-                ),
-                child: _imageUrls.isEmpty
-                    ? Column(
-                        children: [
-                          Icon(
-                            Icons.add_photo_alternate_outlined,
-                            size: 48,
-                            color: AppColors.primary.withOpacity(0.5),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Добавить изображения',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Нажмите, чтобы добавить фото (до 5 шт)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary.withOpacity(0.7),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: AppColors.primary,
-                            size: 24,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${_imageUrls.length} изображение добавлено',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Нажмите, чтобы изменить',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: _imageUrls.isEmpty ? AppColors.divider : AppColors.primary)),
+                child: Center(child: Text(_imageUrls.isEmpty ? 'Добавить изображение' : 'Изображение добавлено')),
               ),
             ),
             
             const SizedBox(height: 20),
-            
-            // Категории
-            const Text(
-              'Категории',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const Text('Категории', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             Wrap(
               spacing: 8,
-              runSpacing: 8,
-              children: _availableCategories.map((category) {
-                final isSelected = _selectedCategories.contains(category);
-                return FilterChip(
-                  label: Text(category),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedCategories.add(category);
-                      } else {
-                        _selectedCategories.remove(category);
-                      }
-                    });
-                  },
-                  backgroundColor: AppColors.surface,
-                  selectedColor: AppColors.primary.withOpacity(0.2),
-                  checkmarkColor: AppColors.primary,
-                  labelStyle: TextStyle(
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                    fontSize: 13,
-                  ),
-                  side: BorderSide(
-                    color: isSelected ? AppColors.primary : AppColors.divider,
-                  ),
-                );
-              }).toList(),
+              children: _availableCategories.map((cat) => FilterChip(
+                label: Text(cat),
+                selected: _selectedCategories.contains(cat),
+                onSelected: (val) => setState(() => val ? _selectedCategories.add(cat) : _selectedCategories.remove(cat)),
+              )).toList(),
             ),
             
             const SizedBox(height: 20),
-            
-            // Переключатель "Нужен совет"
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: const Text(
-                      'Нужен совет',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Отметьте, если хотите получить обратную связь',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    value: _isAskingForHelp,
-                    onChanged: (value) {
-                      setState(() {
-                        _isAskingForHelp = value;
-                      });
-                    },
-                    activeColor: AppColors.primary,
-                  ),
-                  
-                  if (_isAskingForHelp) ...[
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _questionController,
-                      decoration: InputDecoration(
-                        hintText: 'О чём именно вы хотите спросить?',
-                        hintStyle: const TextStyle(color: AppColors.textSecondary),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.divider),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: AppColors.primary, width: 2),
-                        ),
-                        filled: true,
-                        fillColor: AppColors.background,
-                      ),
-                      maxLines: 3,
-                    ),
-                  ],
-                ],
-              ),
+            SwitchListTile(
+              title: const Text('Нужен совет'),
+              value: _isAskingForHelp,
+              onChanged: (val) => setState(() => _isAskingForHelp = val),
             ),
-            
-            const SizedBox(height: 40),
+            if (_isAskingForHelp)
+              TextField(controller: _questionController, decoration: const InputDecoration(hintText: 'О чем спросить?')),
           ],
         ),
       ),

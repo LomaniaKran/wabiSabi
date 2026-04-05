@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wabisabi_front/presentation/screens/auth_wrapper.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/text_styles.dart';
-import 'presentation/screens/login_screen.dart';
 
 void main() {
   runApp(const ProviderScope(child: MyApp()));

@@ -1,36 +1,37 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../data/models/post.dart';        // Добавляем импорт Post
-import '../data/models/comment.dart';     // Добавляем импорт Comment
+import '../data/models/post.dart';
+import '../data/models/comment.dart';
 import '../data/repositories/post_repository.dart';
 import '../data/repositories/comment_repository.dart';
 import '../data/repositories/user_repository.dart';
 
 // Репозитории
 final postRepositoryProvider = Provider<PostRepository>((ref) {
-  final repo = PostRepository();
-  ref.onDispose(() => repo.dispose());
-  return repo;
+  return PostRepository();
 });
 
 final commentRepositoryProvider = Provider<CommentRepository>((ref) {
-  final repo = CommentRepository();
-  ref.onDispose(() => repo.dispose());
-  return repo;
+  return CommentRepository();
 });
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
   return UserRepository();
 });
 
-// Потоки данных
-final postsStreamProvider = StreamProvider<List<Post>>((ref) {
-  return ref.watch(postRepositoryProvider).postsStream;
+// --- ИЗМЕНЕНИЯ ЗДЕСЬ: Переходим с StreamProvider на FutureProvider ---
+
+final postsFutureProvider = FutureProvider<List<Post>>((ref) async {
+  return ref.watch(postRepositoryProvider).fetchPosts();
 });
 
+// Получение постов автора
 final userPostsProvider = FutureProvider.family<List<Post>, String>((ref, userId) async {
-  return ref.watch(postRepositoryProvider).getPostsByAuthor(userId);
+  final allPosts = await ref.watch(postRepositoryProvider).fetchPosts();
+  return allPosts.where((post) => post.authorId == userId).toList();
 });
 
+// Комментарии
 final postCommentsProvider = FutureProvider.family<List<Comment>, String>((ref, postId) async {
+  // Тут нужно будет убедиться, что у тебя есть метод в CommentRepository
   return ref.watch(commentRepositoryProvider).getCommentsForPost(postId);
 });
